@@ -353,16 +353,8 @@ trait Stapler
 			case 'url':
 				$resource = $this->url($attachment, $style);
 
-				// Get the full path to the public folder
-				$public_path = realpath(path('public'));
-
-				// Create an intersect between $public_path and $_SERVER['DOCUMENT_ROOT']
-				// This generates correct url paths for projects that oare stored in a subfolder
-				// of the webserver's document root.
-				$document_root = str_replace(realpath($_SERVER['DOCUMENT_ROOT']), '', $public_path);
-
-				if(file_exists($public_path.$resource)){
-					return $document_root.$resource;
+				if(file_exists(path('public').$resource)){
+					return $resource;
 				}
 				else{
 					return $this->default_url($attachment, $style);
