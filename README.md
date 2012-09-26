@@ -17,7 +17,7 @@ Stapler is distributed as a bundle, which is how it should be used in your app.
 Install the bundle using Artisan:
 
 ```php 
-artisan bundle::install stapler
+artisan bundle:install stapler
 ```
 
 Update your `application/bundles.php` file with:
@@ -48,7 +48,7 @@ class User extends Eloquent {
 
 From the command line, use the migration generator:
 
-php artisan stapler::fasten users logo
+php artisan stapler:fasten users logo
 php artisan migrate
 
 In your new view:
