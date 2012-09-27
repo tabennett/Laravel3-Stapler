@@ -128,7 +128,7 @@ will create a copy of the file upload, resized and cropped to 100x100.
 
 ## Examples
 
-Create an attachment named 'picture', with both thumbnail(100x100) and large(300x300) styles, using custom url and default_url configurations.
+Create an attachment named 'picture', with both thumbnail (100x100) and large (300x300) styles, using custom url and default_url configurations.
 
 ```php
 public function __construct($attributes = array(), $exists = false){
@@ -145,7 +145,7 @@ public function __construct($attributes = array(), $exists = false){
 }
 ```
 
-Create an attachment named 'picture', with both thumbnail(100x100) and large(300x300) styles, using custom url and default_url configurations, with
+Create an attachment named 'picture', with both thumbnail (100x100) and large (300x300) styles, using custom url and default_url configurations, with
 the keep_old_files flag set to true (so that older file uploads aren't deleted from the file system) and image cropping turned on.
 
 ```php
