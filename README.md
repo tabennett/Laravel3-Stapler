@@ -48,7 +48,7 @@ class User extends Eloquent {
 
 From the command line, use the migration generator:
 
-php artisan stapler:fasten users logo
+php artisan stapler::fasten users logo
 php artisan migrate
 
 In your new view:
