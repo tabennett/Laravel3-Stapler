@@ -105,18 +105,18 @@ Currently, the following interpolations are available for use:
 
 In a minimal configuration, the following settings are enabled by default:
 
-*   'url' => '/system/:class/:attachment/:id_partition/:style/:filename',
-*   'default_url' => '/:attachment/:style/missing.png',
-*   'default_style' => 'original',
-*   'styles' => [],
-*   'keep_old_files' => false
+*   url: '/system/:class/:attachment/:id_partition/:style/:filename',
+*   default_url: '/:attachment/:style/missing.png',
+*   default_style: 'original',
+*   styles: [],
+*   keep_old_files: false
 
-**url**: The file system path to the file upload, relative to the public folder (document root) of the project.
-**default_url**: The default file returned when no file upload is present for a record.
-**default_style**: The default style returned from the Stapler file location helper methods.  An unaltered version of uploaded file
-is always stored within the 'original' style, however the default_style can be set to point to any of the defined syles within the styles array.
-**styles**: An array of image sizes defined for the file attachment.  Stapler will attempt to use the Resizer bundle to format the file upload
-into the defined style.  To enable image cropping, insert a # symbol after the resizing options.  For example:
+*   **url**: The file system path to the file upload, relative to the public folder (document root) of the project.
+*   **default_url**: The default file returned when no file upload is present for a record.
+*   **default_style**: The default style returned from the Stapler file location helper methods.  An unaltered version of uploaded file
+    is always stored within the 'original' style, however the default_style can be set to point to any of the defined syles within the styles array.
+*   **styles**: An array of image sizes defined for the file attachment.  Stapler will attempt to use the Resizer bundle to format the file upload
+    into the defined style.  To enable image cropping, insert a # symbol after the resizing options.  For example:
 
 ```php
 'styles' => [
