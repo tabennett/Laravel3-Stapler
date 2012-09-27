@@ -56,7 +56,7 @@ php artisan migrate
 In your new view:
 
 ```php
-<?= Form::open_for_files('user/new', 'POST') ?>
+<?= Form::open_for_files('/users', 'POST') ?>
 	<?= Form::file('avatar') ?>
 <?= Form::close() ?>
 ```
@@ -196,6 +196,16 @@ public function user(){
 }
 ```
 
+In the user new view:
+
+```php
+<?= Form::open_for_files('/users', 'POST') ?>
+    <?= Form::file('photos[]') ?>
+    <?= Form::file('photos[]') ?>
+    <?= Form::file('photos[]') ?>
+<?= Form::close() ?>
+```
+
 In controllers/user.php
 ```php
 public function post_create()
@@ -205,7 +215,7 @@ public function post_create()
     // Re-arrange the $_FILES array
     $files = User::arrange_files(Input::file('photos'));
     
-    // Save each file
+    // Attach each photo to the user and save it.
     foreach($files as $file){
         $photo = new Photo();
         $photo->photo = $file;
