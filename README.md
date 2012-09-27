@@ -92,7 +92,7 @@ For an attachment named 'avatar' the following fields would be created:
 *   avatar_uploaded_at
 
 Stapler can be configured to store files in a variety of ways.  This is done by defining a url string which points to the uploaded file asset.
-Currently, the following interpolations are available for use:
+This is done via string interpolations.  Currently, the following interpolations are available for use:
 
 *   :attachment - The name of the file attachment as declared in the has_attached_file function, e.g 'avatar'.
 *   :class  - The classname of the model contaning the file attachment, e.g User.  Stapler can handle namespacing of classes.
@@ -125,3 +125,113 @@ In a minimal configuration, the following settings are enabled by default:
 ```
 
 will create a copy of the file upload, resized and cropped to 100x100.
+
+## Examples
+
+Create an attachment named 'picture', with both thumbnail(100x100) and large(300x300) styles, using custom url and default_url configurations.
+
+```php
+public function __construct($attributes = array(), $exists = false){
+    parent::__construct($attributes, $exists);
+
+    $this->has_attached_file('picture', [
+        'styles' => [
+            'thumbnail' => '100x100#',
+            'thumbnail' => '300x300#'
+        ],
+        'url' => '/system/:attachment/:id_partition/:style/:filename',
+        'default_url' => '/:attachment/:style/missing.jpg'
+    ]);
+}
+```
+
+Create an attachment named 'picture', with both thumbnail(100x100) and large(300x300) styles, using custom url and default_url configurations, with
+the keep_old_files flag set to true so that older file uploads aren't deleted from the file system.
+
+```php
+public function __construct($attributes = array(), $exists = false){
+    parent::__construct($attributes, $exists);
+
+    $this->has_attached_file('picture', [
+        'styles' => [
+            'thumbnail' => '100x100#',
+            'thumbnail' => '300x300#'
+        ],
+        'url' => '/system/:attachment/:id_partition/:style/:filename',
+        'default_url' => '/:attachment/:style/missing.jpg',
+        'keep_old_files' => true
+    ]);
+}
+```
+
+Stapler makes it easy to manage multiple file uploads as well.  A custom static method 'arrange_files' is provided
+in order to arrange the $_FILES array into a more convient form for handling multiple files.  Here's an example of how this might work:
+
+In models/user.php:
+
+```php
+// A user has many photos.
+public function photos(){
+    return $this->has_many('Photo');
+}
+```
+
+In models/photo.php:
+```php
+public function __construct($attributes = array(), $exists = false){
+        parent::__construct($attributes, $exists);
+
+        $this->has_attached_file('photo', [
+            'styles' => [
+                'thumbnail' => '100x100#'
+            ]
+        ]);
+    }
+
+// A photo belongs to a user.
+public function user(){
+    return $this->belongs_to('User');
+}
+```
+
+In controllers/user.php
+```php
+public function post_create()
+{
+    $user = new User();
+
+    // Re-arrange the $_FILES array
+    $files = User::arrange_files(Input::file('photos'));
+    
+    // Save each file
+    foreach($files as $file){
+        $photo = new Photo();
+        $photo->photo = $file;
+        $user->photos()->insert($photo);
+    }
+}
+```
+
+Displaying uploaded files is also easy.  Stapler provides convenience methods for retrieving url and path locations to uploaded files.  As an example,
+for an attachment named 'photo', the static methods photo_path() and photo_url() would be available on the model to which the file was attached.
+Assuming an attachment named photo that's attached to a User model, consider the following:
+
+Display a resized thumbnail style image belonging to a user record:
+```php
+<?= HTML::image($user->photo_url('thumbnail') ?>
+```
+
+Display the original image style (unmodified image):
+```php
+<?= HTML::image($user->photo_url('original') ?>
+```
+
+This also displays the unmodified original image (unless the :default_url interpolation has been set to a different style):
+```php
+<?= HTML::image($user->photo_url() ?>
+
+We can also retrieve the file path of an uploaded file.
+This returns the physical file system path to the thumbnail style image:
+```php
+$user->photo_path('thumbnail');
+```
