@@ -136,8 +136,8 @@ public function __construct($attributes = array(), $exists = false){
 
     $this->has_attached_file('picture', [
         'styles' => [
-            'thumbnail' => '100x100#',
-            'thumbnail' => '300x300#'
+            'thumbnail' => '100x100',
+            'thumbnail' => '300x300'
         ],
         'url' => '/system/:attachment/:id_partition/:style/:filename',
         'default_url' => '/:attachment/:style/missing.jpg'
@@ -146,7 +146,7 @@ public function __construct($attributes = array(), $exists = false){
 ```
 
 Create an attachment named 'picture', with both thumbnail(100x100) and large(300x300) styles, using custom url and default_url configurations, with
-the keep_old_files flag set to true so that older file uploads aren't deleted from the file system.
+the keep_old_files flag set to true (so that older file uploads aren't deleted from the file system) and image cropping turned on.
 
 ```php
 public function __construct($attributes = array(), $exists = false){
@@ -218,17 +218,17 @@ Assuming an attachment named photo that's attached to a User model, consider the
 
 Display a resized thumbnail style image belonging to a user record:
 ```php
-<?= HTML::image($user->photo_url('thumbnail') ?>
+<?= HTML::image($user->photo_url('thumbnail')) ?>
 ```
 
 Display the original image style (unmodified image):
 ```php
-<?= HTML::image($user->photo_url('original') ?>
+<?= HTML::image($user->photo_url('original')) ?>
 ```
 
 This also displays the unmodified original image (unless the :default_url interpolation has been set to a different style):
 ```php
-<?= HTML::image($user->photo_url() ?>
+<?= HTML::image($user->photo_url()) ?>
 ```
 
 We can also retrieve the file path of an uploaded file.
