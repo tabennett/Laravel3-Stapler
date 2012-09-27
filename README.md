@@ -229,6 +229,7 @@ Display the original image style (unmodified image):
 This also displays the unmodified original image (unless the :default_url interpolation has been set to a different style):
 ```php
 <?= HTML::image($user->photo_url() ?>
+```
 
 We can also retrieve the file path of an uploaded file.
 This returns the physical file system path to the thumbnail style image:
