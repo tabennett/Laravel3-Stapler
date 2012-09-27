@@ -48,8 +48,10 @@ class User extends Eloquent {
 
 From the command line, use the migration generator:
 
-```php artisan stapler::fasten users avatar
-php artisan migrate```
+```php
+php artisan stapler::fasten users avatar
+php artisan migrate
+```
 
 In your new view:
 
