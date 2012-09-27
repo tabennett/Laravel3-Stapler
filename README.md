@@ -79,3 +79,49 @@ To detach a file, simply set the attribute to null:
 $user->avatar = null;
 $user->save();
 ```
+
+## Configuration
+
+Stapler works by attaching file uploads to records stored within a database table (model).  To accomplish this, four fields
+(named after the attachemnt) are created (via stapler:fasten) in the corresponding table for any model containing a file attachment.  
+For an attachment named 'avatar' the following fields would be created:
+
+*   avatar_file_name
+*   avatar_file_size
+*   avatar_content_type
+*   avatar_uploaded_at
+
+Stapler can be configured to store files in a variety of ways.  This is done by defining a url string which points to the uploaded file asset.
+Currently, the following interpolations are available for use:
+
+*   :attachment - The name of the file attachment as declared in the has_attached_file function, e.g 'avatar'.
+*   :class  - The classname of the model contaning the file attachment, e.g User.  Stapler can handle namespacing of classes.
+*   :extension - The file extension type of the uploaded file, e.g '.jpg'
+*   :filename - The name of the uploaded file, e.g 'some_file.jpg'
+*   :id - The id of the corresponding database record for the uploaded file.
+*   :id_partition - The partitioned id of the corresponding database record for the uploaded file, e.g an id = 1 is interpolated as 000/000/001.
+*   :laravel_root - The path to the root of the laravel project.
+*   :style - The resizing style of the file (images only), e.g 'thumbnail' or 'orginal'.
+
+In a minimal configuration, the following settings are enabled by default:
+
+*   'url' => '/system/:class/:attachment/:id_partition/:style/:filename',
+*   'default_url' => '/:attachment/:style/missing.png',
+*   'default_style' => 'original',
+*   'styles' => [],
+*   'keep_old_files' => false
+
+**url**: The file system path to the file upload, relative to the public folder (document root) of the project.
+**default_url**: The default file returned when no file upload is present for a record.
+**default_style**: The default style returned from the Stapler file location helper methods.  An unaltered version of uploaded file
+is always stored within the 'original' style, however the default_style can be set to point to any of the defined syles within the styles array.
+**styles**: An array of image sizes defined for the file attachment.  Stapler will attempt to use the Resizer bundle to format the file upload
+into the defined style.  To enable image cropping, insert a # symbol after the resizing options.  For example:
+
+```php
+'styles' => [
+    'thumbnail' => '100x100#'
+]
+```
+
+will create a copy of the file upload, resized and cropped to 100x100.

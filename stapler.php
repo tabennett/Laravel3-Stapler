@@ -282,7 +282,7 @@ trait Stapler
 	/**
 	 * Handle dynamic method calls on the model.
 	 *
-	 * This allows for the creation of our file url/path convenienceconvenienceconvenience methods
+	 * This allows for the creation of our file url/path convenience methods
 	 * on the model: {attachment}_file path and {attachment}_file url.  If 
 	 * the format of the called function doesn't match these functions we'll 
 	 * hand control back over to the __call function of the parent model class.
@@ -619,7 +619,7 @@ trait Stapler
 
 	/**
 	 * Utility function for arranging the global $_FILE uploades array so that each file
-	 * is stored in its own array as opposed to having it's values spread across child arrays.
+	 * is stored in its own array as opposed to having its values spread across child arrays.
 	 *
 	 * @param array $files
 	 * @return array $arranged_files;
