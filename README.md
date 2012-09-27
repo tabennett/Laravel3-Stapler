@@ -2,7 +2,7 @@
 
 Stapler can be used to generate file upload attachments for use with the wonderfully fabulous Laravel PHP Framework, authored by Taylor Otwell.
 If you have used ruby on rails' paperclip plugin then you will be familiar with its syntax.  This bundle is inspired entirely from the work done
-by the guys at thoughtbot for the Rails Paperclip bundle.  While not an exact duplicate, if you've used Paperclip before then you should be 
+by the guys at thoughtbot for the Rails Paperclip bundle: https://github.com/thoughtbot/paperclip.  While not an exact duplicate, if you've used Paperclip before then you should be 
 somewhat familiar with how this bundle works.
 
 Stapler was created by Travis Bennett and Kelt Dockins, with thanks to Matthew Machuga for help and support.
@@ -48,8 +48,8 @@ class User extends Eloquent {
 
 From the command line, use the migration generator:
 
-php artisan stapler::fasten users logo
-php artisan migrate
+```php artisan stapler::fasten users avatar
+php artisan migrate```
 
 In your new view:
 
