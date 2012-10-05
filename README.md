@@ -101,16 +101,16 @@ in the corresponding table for any model containing a file attachment.  For exam
 Stapler can be configured to store files in a variety of ways.  This is done by defining a url string which points to the uploaded file asset.
 This is done via string interpolations.  Currently, the following interpolations are available for use:
 
-*   :attachment - The name of the file attachment as declared in the has_attached_file function, e.g 'avatar'.
-*   :class  - The classname of the model contaning the file attachment, e.g User.  Stapler can handle namespacing of classes.
-*   :extension - The file extension type of the uploaded file, e.g '.jpg'
-*   :filename - The name of the uploaded file, e.g 'some_file.jpg'
-*   :id - The id of the corresponding database record for the uploaded file.
-*   :id_partition - The partitioned id of the corresponding database record for the uploaded file, e.g an id = 1 is interpolated as 000/000/001.
-    this is the default and recommended setting for Stapler.  Partioned id's help overcome the 32k subfolder problem that occurs in nix-based 
+*   **:attachment** - The name of the file attachment as declared in the has_attached_file function, e.g 'avatar'.
+*   **:class**  - The classname of the model contaning the file attachment, e.g User.  Stapler can handle namespacing of classes.
+*   **:extension** - The file extension type of the uploaded file, e.g '.jpg'
+*   **:filename** - The name of the uploaded file, e.g 'some_file.jpg'
+*   **:id** - The id of the corresponding database record for the uploaded file.
+*   **:id_partition** - The partitioned id of the corresponding database record for the uploaded file, e.g an id = 1 is interpolated as 000/000/001.
+    This is the default and recommended setting for Stapler.  Partioned id's help overcome the 32k subfolder problem that occurs in nix-based 
     systems using the EXT3 file system.
-*   :laravel_root - The path to the root of the laravel project.
-*   :style - The resizing style of the file (images only), e.g 'thumbnail' or 'orginal'.
+*   **:laravel_root** - The path to the root of the laravel project.
+*   **:style** - The resizing style of the file (images only), e.g 'thumbnail' or 'orginal'.
 
 In a minimal configuration, the following settings are enabled by default:
 
