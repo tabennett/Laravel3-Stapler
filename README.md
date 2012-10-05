@@ -112,13 +112,14 @@ This is done via string interpolations.  Currently, the following interpolations
 *   **:laravel_root** - The path to the root of the laravel project.
 *   **:style** - The resizing style of the file (images only), e.g 'thumbnail' or 'orginal'.
 
+These interpolation can then be used to define a url and default_url for the location of your uploaded files.
 In a minimal configuration, the following settings are enabled by default:
 
-*   url: '/system/:class/:attachment/:id_partition/:style/:filename',
-*   default_url: '/:attachment/:style/missing.png',
-*   default_style: 'original',
-*   styles: [],
-*   keep_old_files: false
+*   **url**: '/system/:class/:attachment/:id_partition/:style/:filename',
+*   **default_url**: '/:attachment/:style/missing.png',
+*   **default_style**: 'original',
+*   **styles**: [],
+*   **keep_old_files**: false
 
 *   **url**: The file system path to the file upload, relative to the public folder (document root) of the project.
 *   **default_url**: The default file returned when no file upload is present for a record.
