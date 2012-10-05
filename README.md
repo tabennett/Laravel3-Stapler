@@ -27,6 +27,9 @@ Update your `application/bundles.php` file with:
 ```
 
 ## Quickstart
+In the document root of your application (most likely the public folder), create a folder named system and 
+your application write permissions to it.
+
 In your model:
 
 ```php
@@ -84,9 +87,11 @@ $user->save();
 
 ## Configuration
 
-Stapler works by attaching file uploads to records stored within a database table (model).  To accomplish this, four fields
-(named after the attachemnt) are created (via stapler:fasten) in the corresponding table for any model containing a file attachment.  
-For an attachment named 'avatar' the following fields would be created:
+Stapler works by attaching file uploads to records stored within a database table (model).  Configuration is (currently) available on a per model 
+basis only.  Each model can have multiple attachments defined (avatar, photo, some_random_attachment, etc) and in turn each attachment can have 
+multiple sizes (styles) defined.  When an image or file is uploaded, Stapler will handle all the file processing (moving, resizing, etc) and 
+provide helper methods for retreiving the uploaded assets.  To accomplish this, four fields (named after the attachemnt) are created (via stapler:fasten) 
+in the corresponding table for any model containing a file attachment.  For example, an attachment named 'avatar' the following fields would be created:
 
 *   avatar_file_name
 *   avatar_file_size
@@ -102,6 +107,8 @@ This is done via string interpolations.  Currently, the following interpolations
 *   :filename - The name of the uploaded file, e.g 'some_file.jpg'
 *   :id - The id of the corresponding database record for the uploaded file.
 *   :id_partition - The partitioned id of the corresponding database record for the uploaded file, e.g an id = 1 is interpolated as 000/000/001.
+    this is the default and recommended setting for Stapler.  Partioned id's help overcome the 32k subfolder problem that occurs in nix-based 
+    systems using the EXT3 file system.
 *   :laravel_root - The path to the root of the laravel project.
 *   :style - The resizing style of the file (images only), e.g 'thumbnail' or 'orginal'.
 
