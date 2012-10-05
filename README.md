@@ -28,7 +28,7 @@ Update your `application/bundles.php` file with:
 
 ## Quickstart
 In the document root of your application (most likely the public folder), create a folder named system and 
-your application write permissions to it.
+grant your application write permissions to it.
 
 In your model:
 
