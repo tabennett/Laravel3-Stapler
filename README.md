@@ -221,7 +221,7 @@ public function post_create()
     $user = new User();
 
     // Re-arrange the $_FILES array
-    $files = User::arrange_files(Input::file('photos'));
+    $files = Photo::arrange_files(Input::file('photos'));
     
     // Attach each photo to the user and save it.
     foreach($files as $file){
