@@ -43,7 +43,8 @@ trait Stapler
 	 *
 	 * @return array
 	*/
-	protected static function interpolations() {
+	protected static function interpolations() 
+	{
 		return [
 			':attachment' => 'attachment',
 			':basename' => 'basename',
@@ -83,9 +84,9 @@ trait Stapler
 
 		// Validate the attachment style options.  Basically, we don't want to see a url with   
 		// a :style interpolation in it without having corresponding style options to replace it with. 
-		if(strpos($options['url'], ':style') === true)
+		if (strpos($options['url'], ':style') === true)
 		{
-			if(empty($options['style']))
+			if (empty($options['style']))
 			{
 		        $trace = debug_backtrace();
 		        trigger_error("Invalid style options {$trace[0]['file']} on line {$trace[0]['line']}", E_USER_NOTICE);
@@ -94,7 +95,8 @@ trait Stapler
 
 		// Validate the attachment url options.  A url is required to 
 		// have either an :id or an :id_partition interpolation.
-		if(preg_match("/:id\b/", $options['url']) !== 1 && preg_match("/:id_partition\b/", $options['url']) !== 1){
+		if (preg_match("/:id\b/", $options['url']) !== 1 && preg_match("/:id_partition\b/", $options['url']) !== 1)
+		{
 			$trace = debug_backtrace();
 			trigger_error("Invalid file url, an :id or :id_partition is required {$trace[0]['file']} on line {$trace[0]['line']}", E_USER_NOTICE);
 		}
@@ -108,16 +110,19 @@ trait Stapler
 		$after_save = 'eloquent.saved: '.get_class($this);
 		$after_delete = 'eloquent.deleted: '.get_class($this);
 
-        if(!Event::listeners($before_save)){
-        	Event::listen($before_save, array(get_class(), 'set_attributes'));
+        if (!Event::listeners($before_save))
+        {
+        	Event::listen($before_save, [get_class(), 'set_attributes']);
         }
  
-        if(!Event::listeners($after_save)){
-        	Event::listen($after_save, array(get_class(), 'upload'));
+        if (!Event::listeners($after_save))
+        {
+        	Event::listen($after_save, [get_class(), 'upload']);
         }
 
-        if(!Event::listeners($after_delete)){
-        	Event::listen($after_delete, array(get_class(), 'remove_files'));
+        if (!Event::listeners($after_delete))
+        {
+        	Event::listen($after_delete, [get_class(), 'remove_files']);
         }
 	}
 
@@ -131,10 +136,11 @@ trait Stapler
 	{
 		// Loop through each attachment type, if there's a corresponding model attribute
 		// containing a file then we'll fill the model attributes for that attachment type.
-		foreach($model->attached_files as $attachment => $attachment_options) {
-			if(array_key_exists($attachment, $model->attributes))
+		foreach($model->attached_files as $attachment => $attachment_options) 
+		{
+			if (array_key_exists($attachment, $model->attributes))
 			{
-				if(is_null($model->attributes[$attachment])) 
+				if (is_null($model->attributes[$attachment])) 
 				{
 					// empty the model's file attachment attributes.
 					$attrs = [
@@ -150,11 +156,12 @@ trait Stapler
 					// Store the file attachment in the $tmp_file member variable for later use.
 					$model->tmp_file = $model->attributes[$attachment];
 				}
-				elseif(is_array($model->attributes[$attachment]) && $model->attributes[$attachment]['error'] == 0) 
+				elseif (is_array($model->attributes[$attachment]) && $model->attributes[$attachment]['error'] == 0) 
 				{
 					// Validate the authenticity of the file upload
-					if (!is_uploaded_file($model->attributes[$attachment]['tmp_name'])) {
-						throw new Exception("File upload hijacking detected!");
+					if (!is_uploaded_file($model->attributes[$attachment]['tmp_name'])) 
+					{
+						throw new \Exception("File upload hijacking detected!");
 					}	
 					
 					// Create an array of attributes to hold meta information about file.
@@ -189,9 +196,9 @@ trait Stapler
 	{
 		// Loop through each attachment type, if there's a corresponding model attribute
 		// containing a file we'll then we'll attempt to process the file.
-		foreach($model->attached_files as $attachment => $attachment_options)
+		foreach ($model->attached_files as $attachment => $attachment_options)
 		{
-			if(is_null($model->tmp_file)) 
+			if (is_null($model->tmp_file)) 
 			{
 				// Build a path to the id/id_partition directory for this model
 				$path = $model->path($attachment);
@@ -203,24 +210,27 @@ trait Stapler
 				continue;
 			}
 
-			if(!empty($model->tmp_file))
+			if (!empty($model->tmp_file))
 			{
 				// Loop through each stye and process the file upload.
-				foreach($attachment_options['styles'] as $style_name => $style_dimensions){
+				foreach ($attachment_options['styles'] as $style_name => $style_dimensions)
+				{
 					$file_path = $model->path($attachment, $style_name);
 
 					// Create the directory if it doesn't already exist.
-					if(!is_dir(dirname($file_path))){
+					if (!is_dir(dirname($file_path)))
+					{
 						mkdir(dirname($file_path), 0777, true);
 					}
 
 					// Remove previous uploads.
-					if(!$attachment_options['keep_old_files']){
+					if (!$attachment_options['keep_old_files'])
+					{
 						$file_directory = dirname($file_path);
 						$model->empty_directory($file_directory);
 					}
 
-					if(!empty($style_dimensions) && static::is_image($model->tmp_file['tmp_name']))
+					if (!empty($style_dimensions) && static::is_image($model->tmp_file['tmp_name']))
 					{
 						// This is an image file so we'll need to loop through each style and
 						// do any necessary resizing using the Resizer bundle to save our files.
@@ -228,12 +238,14 @@ trait Stapler
 						$width = $dimensions[0];
 						$height = $dimensions[1];
 						
-						if(strpos($height, '#') === false){
+						if(strpos($height, '#') === false)
+						{
 							$success = \Resizer::open($model->tmp_file)
 							->resize($width , $height , 'auto')
 							->save($file_path);
 						}
-						else{
+						else
+						{
 							$height = rtrim($height, '#');
 							$success = \Resizer::open($model->tmp_file)
 							->resize($width , $height , 'crop')
@@ -246,7 +258,8 @@ trait Stapler
 						$success = move_uploaded_file($model->tmp_file['tmp_name'], $file_path);
 					}
 					
-					if (!$success){
+					if (!$success)
+					{
 				        $trace = debug_backtrace();
 				        trigger_error("Failed to save file in {$trace[0]['file']} on line {$trace[0]['line']}", E_USER_NOTICE);
 					}
@@ -376,7 +389,8 @@ trait Stapler
 	*/
 	protected static function is_image($file)
 	{
-		if(File::is('jpg', $file) || File::is('jpeg', $file) || File::is('gif', $file) || File::is('png', $file)){
+		if (File::is('jpg', $file) || File::is('jpeg', $file) || File::is('gif', $file) || File::is('png', $file))
+		{
 			return true;
 		}
 
@@ -431,7 +445,7 @@ trait Stapler
 	*/
 	protected function default_url($attachment, $style = '')
 	{
-		if(isset($this->attached_files[$attachment]['default_url']))
+		if (isset($this->attached_files[$attachment]['default_url']))
 		{
 			$url = $this->attached_files[$attachment]['default_url'];
 			return $this->interpolate_string($attachment, $url, $style);
@@ -447,7 +461,8 @@ trait Stapler
 	*/
 	protected function interpolate_string($attachment, $string, $style = '')
 	{
-		foreach(static::interpolations() as $key => $value){
+		foreach (static::interpolations() as $key => $value)
+		{
 			$string = preg_replace("/$key\b/", $this->$value($attachment, $style), $string);
 		}
 
@@ -459,7 +474,8 @@ trait Stapler
 	 *
 	 * @return string
 	*/
-	protected function filename($attachment, $style = '') {
+	protected function filename($attachment, $style = '') 
+	{
 		return $this->get_attribute("{$attachment}_file_name");
 	}
 
@@ -468,7 +484,8 @@ trait Stapler
 	 *
 	 * @return string
 	*/
-	protected function laravel_root($attachment, $style = '') {
+	protected function laravel_root($attachment, $style = '') 
+	{
 		return rtrim(path('base'), '/');
 	}
 
@@ -478,7 +495,8 @@ trait Stapler
 	 *
 	 * @return string
 	*/
-    protected function get_class($attachment, $style = '') {
+    protected function get_class($attachment, $style = '') 
+    {
     	return $this->handle_backslashes(get_class($this));
     }
 
@@ -487,7 +505,8 @@ trait Stapler
 	 *
 	 * @return string
 	*/
-	protected function basename($attachment, $style = '') {
+	protected function basename($attachment, $style = '') 
+	{
 		return pathinfo($this->get_attribute("{$attachment}_file_name"), PATHINFO_FILENAME);
 	}
 
@@ -496,7 +515,8 @@ trait Stapler
 	 *
 	 * @return string
 	*/
-	protected function extension($attachment, $style = '') {
+	protected function extension($attachment, $style = '') 
+	{
 		return File::extension($this->get_attribute("{$attachment}_file_name"));
 	}
 
@@ -505,7 +525,8 @@ trait Stapler
 	 *
 	 * @return string
 	*/
-    protected function id ($attachment, $style = '') {
+    protected function id ($attachment, $style = '') 
+    {
       return $this->get_key();
     }
 
@@ -519,13 +540,16 @@ trait Stapler
 	{
 		$id = $this->get_key();
 
-		if(is_numeric($id)){
+		if (is_numeric($id))
+		{
 			return implode('/', str_split(sprintf('%09d', $id), 3));
 		}
-		elseif(is_string($id)){
+		elseif (is_string($id))
+		{
 			return implode('/', array_slice(str_split($id, 3), 0, 3));
 		}
-		else{
+		else
+		{
 			return null;
 		}
 	}
@@ -536,7 +560,8 @@ trait Stapler
 	 *
 	 * @return string
 	*/
-	protected function attachment($attachment, $style = '') {
+	protected function attachment($attachment, $style = '') 
+	{
 		return Str::plural($attachment);
 	}
 
@@ -545,7 +570,8 @@ trait Stapler
 	 *
 	 * @return string
 	*/
-	protected function style($attachment, $style = '') {
+	protected function style($attachment, $style = '') 
+	{
 		return empty($style) ? $this->attached_files[$attachment]['default_style'] : $style;
 	}
 
@@ -568,13 +594,15 @@ trait Stapler
 		$id_partition = $this->id_partition($attachment, $style);
 		$match = strpos($string, $id_partition);
 		
-		if ($match !== false){
+		if ($match !== false)
+		{
 			// Id partitioning is being used, so we're looking for a
 			// directory that has the pattern /000/000/001 at the end,
 			// so we know we'll need to add 11 spaces to the string offset.
 			$offset = $match + 11;
 		}
-		else{
+		else
+		{
 			// Id partitioning is not being used, so we're looking for
 			// a directory that has the pattern /1 at the end, so we'll
 			// need to add the length of the record id + 1 to the string offset.
@@ -592,7 +620,8 @@ trait Stapler
 	 * @param string $string
 	 * @return string
 	 */
-	protected function handle_backslashes($string) {
+	protected function handle_backslashes($string) 
+	{
 		return str_replace('\\', '/', ltrim($string, '\\'));
 	}
 
@@ -606,14 +635,27 @@ trait Stapler
 	 */
 	protected function empty_directory($directory, $deleteDirectory = false)
 	{
-		if (!$directoryHandle = @opendir($directory)) return;
-		while (false !== ($object = readdir($directoryHandle))) {
-			if($object=='.' || $object=='..') continue;
-			if (!@unlink($directory.'/'.$object)) $this->empty_directory($directory.'/'.$object, true);		//The object is a folder
+		if (!$directoryHandle = @opendir($directory)) 
+		{
+			return;
 		}
-		if ($deleteDirectory){
+		
+		while (false !== ($object = readdir($directoryHandle))) 
+		{
+			if ($object=='.' || $object=='..')
+			{
+				continue;
+			}
+
+			if (!@unlink($directory.'/'.$object))
+			{
+				$this->empty_directory($directory.'/'.$object, true);		// The object is a folder
+			}
+		}
+		if ($deleteDirectory)
+		{
 			closedir($directoryHandle);
-			@rmdir($directory);
+			rmdir($directory);
 		}
 	}
 
@@ -624,10 +666,12 @@ trait Stapler
 	 * @param array $files
 	 * @return array $arranged_files;
 	 */
-    public static function arrange_files($files = []) {
+    public static function arrange_files($files = []) 
+    {
         $arranged_files = [];
 
-		foreach ($files['error'] as $key => $error) {
+		foreach ($files['error'] as $key => $error) 
+		{
 		    $arranged_files[$key]['name'] = $files['name'][$key];
 		    $arranged_files[$key]['type'] = $files['type'][$key];
 		    $arranged_files[$key]['tmp_name'] = $files['tmp_name'][$key];
