@@ -88,8 +88,7 @@ trait Stapler
 		{
 			if (empty($options['style']))
 			{
-		        $trace = debug_backtrace();
-		        trigger_error("Invalid style options {$trace[0]['file']} on line {$trace[0]['line']}", E_USER_NOTICE);
+		        trigger_error("Stapler: Invalid style options encountered, please check your Stapler config.", E_USER_NOTICE);
 			}
 		}
 
@@ -97,8 +96,7 @@ trait Stapler
 		// have either an :id or an :id_partition interpolation.
 		if (preg_match("/:id\b/", $options['url']) !== 1 && preg_match("/:id_partition\b/", $options['url']) !== 1)
 		{
-			$trace = debug_backtrace();
-			trigger_error("Invalid file url, an :id or :id_partition is required {$trace[0]['file']} on line {$trace[0]['line']}", E_USER_NOTICE);
+			trigger_error("Stapler: Invalid file url, an :id or :id_partition is required.", E_USER_NOTICE);
 		}
 
 		// Add the attachment to the list of attachments to be processed during saving.
@@ -161,7 +159,7 @@ trait Stapler
 					// Validate the authenticity of the file upload
 					if (!is_uploaded_file($model->attributes[$attachment]['tmp_name'])) 
 					{
-						throw new \Exception("File upload hijacking detected!");
+						throw new \Exception("Stapler: File upload hijacking detected!");
 					}	
 					
 					// Create an array of attributes to hold meta information about file.
@@ -260,8 +258,7 @@ trait Stapler
 					
 					if (!$success)
 					{
-				        $trace = debug_backtrace();
-				        trigger_error("Failed to save file in {$trace[0]['file']} on line {$trace[0]['line']}", E_USER_NOTICE);
+				        throw new \Exception("Stapler: Failed to save file.");
 					}
 				}
 			}
