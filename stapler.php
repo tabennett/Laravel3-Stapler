@@ -152,7 +152,7 @@ trait Stapler
 					$model->fill($attrs, true);
 
 					// Store the file attachment in the $tmp_file member variable for later use.
-					$model->tmp_file = $model->attributes[$attachment];
+					$model->tmp_file[$attachment] = $model->attributes[$attachment];
 				}
 				elseif (is_array($model->attributes[$attachment]) && $model->attributes[$attachment]['error'] == 0) 
 				{
@@ -174,7 +174,7 @@ trait Stapler
 					$model->fill($attrs, true);
 
 					// Store the file attachment in the $tmp_file member variable for later use.
-					$model->tmp_file = $model->attributes[$attachment];
+					$model->tmp_file[$attachment] = $model->attributes[$attachment];
 				}
 
 				// Remove the file attachment from the model attributes array.
@@ -196,7 +196,7 @@ trait Stapler
 		// containing a file we'll then we'll attempt to process the file.
 		foreach ($model->attached_files as $attachment => $attachment_options)
 		{
-			if (is_null($model->tmp_file)) 
+			if (array_key_exists($attachment, $model->tmp_file) && is_null($model->tmp_file[$attachment])) 
 			{
 				// Build a path to the id/id_partition directory for this model
 				$path = $model->path($attachment);
@@ -208,7 +208,7 @@ trait Stapler
 				continue;
 			}
 
-			if (!empty($model->tmp_file))
+			if (array_key_exists($attachment, $model->tmp_file) && !empty($model->tmp_file[$attachment]))
 			{
 				// Loop through each stye and process the file upload.
 				foreach ($attachment_options['styles'] as $style_name => $style_dimensions)
@@ -228,7 +228,7 @@ trait Stapler
 						$model->empty_directory($file_directory);
 					}
 
-					if (!empty($style_dimensions) && static::is_image($model->tmp_file['tmp_name']))
+					if (!empty($style_dimensions) && static::is_image($model->tmp_file[$attachment]['tmp_name']))
 					{
 						// This is an image file so we'll need to loop through each style and
 						// do any necessary resizing using the Resizer bundle to save our files.
@@ -238,14 +238,14 @@ trait Stapler
 						
 						if(strpos($height, '#') === false)
 						{
-							$success = \Resizer::open($model->tmp_file)
+							$success = \Resizer::open($model->tmp_file[$attachment])
 							->resize($width , $height , 'auto')
 							->save($file_path);
 						}
 						else
 						{
 							$height = rtrim($height, '#');
-							$success = \Resizer::open($model->tmp_file)
+							$success = \Resizer::open($model->tmp_file[$attachment])
 							->resize($width , $height , 'crop')
 							->save($file_path);
 						}
@@ -253,7 +253,7 @@ trait Stapler
 					else
 					{
 						// Just save the new file upload.
-						$success = move_uploaded_file($model->tmp_file['tmp_name'], $file_path);
+						$success = move_uploaded_file($model->tmp_file[$attachment]['tmp_name'], $file_path);
 					}
 					
 					if (!$success)
@@ -265,7 +265,7 @@ trait Stapler
 		}
 
 		// Reset the $tmp_file variable
-		$model->tmp_file = [];
+		$model->tmp_file[$attachment] = [];
 	}
 
 	/**
