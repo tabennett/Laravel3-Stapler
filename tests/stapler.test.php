@@ -1,15 +1,23 @@
 <?php
 
-Bundle::start('stapler');
+use org\bovigo\vfs\vfsStream;
+use org\bovigo\vfs\vfsStreamWrapper;
+use org\bovigo\vfs\vfsStreamDirectory;
 
-// Spoof $_SERVER['DOCUMENT_ROOT']
+Bundle::start('stapler');
 $_SERVER['DOCUMENT_ROOT'] = path('public');
 
-class TestObject extends Eloquent {
+/**
+ * This is a dummy test object that is using the Stapler trait
+ * We'll build mocks of this object in order to test the trait itself.
+ */
+class TestModel extends Eloquent {
     use Stapler\stapler;
     
     public function __construct($attributes = array(), $exists = false){
         parent::__construct($attributes, $exists);
+
+        $this->tmp_file['testing'] = '';
 
         $this->has_attached_file('testing', [
             'styles' => [
@@ -21,57 +29,49 @@ class TestObject extends Eloquent {
     }
 }
 
-class StaplerTest extends PHPUnit_Framework_TestCase {
 
-    protected $test_object;
+class StaplerTest extends PHPUnit_Framework_TestCase
+{
 
-    protected static function getMethod($name) {
-        $class = new ReflectionClass('TestObject');
-        $method = $class->getMethod($name);
-        $method->setAccessible(true);
-        return $method;
+    /**
+     * $testModel - A dummy model that uses stapler
+     * @var Eloquent/Model
+     */
+    private $testModel;
+
+    public $mockFileUploadDir;
+
+    /**
+     * setUp method - Fixture creation
+     */
+    public function setUp()
+    {
+        $this->testModel = new TestModel;
+        $this->mockFileUploadDir = vfsStream::setup('foo/bar');
     }
 
-
-	/**
-	 * setUp method
-	 *
-	 * @return void
-	 */
-	public function setUp()
-    { 
-        // Create a simulated model to attach the file to
-        $this->test_object = new TestObject;
-
-        // Create a fake upload directory.
-        mkdir(path('public').'system/testings/000/000/001/thumbnail', 0775, true);
-        copy(path('bundle').'stapler/tests/test.jpg', path('public').'system/testings/000/000/001/thumbnail/test.jpg');
-
-        // Create a fake default url directory.
-        mkdir(path('public').'testings/thumbnail', 0775, true);
-        copy(path('bundle').'stapler/tests/test.jpg', path('public').'testings/thumbnail/missing.jpg');
-	}
-  	
-	/**
-	 * tearDown method
-	 *
-	 * @return void
-	 */
-  	public function tearDown()
+    /**
+     * tearDown method
+     */
+    public function tearDown()
     {
-        // Clean up the fake file uploads directory
-        if (file_exists(path('public').'system/testings/000/000/001/thumbnail/test.jpg')) unlink(path('public').'system/testings/000/000/001/thumbnail/test.jpg');
-        if (is_dir(path('public').'system/testings/000/000/001/thumbnail')) rmdir(path('public').'system/testings/000/000/001/thumbnail');
-        if (is_dir(path('public').'system/testings/000/000/001'))rmdir(path('public').'system/testings/000/000/001');
-        if (is_dir(path('public').'system/testings/000/000')) rmdir(path('public').'system/testings/000/000');
-        if (is_dir(path('public').'system/testings/000')) rmdir(path('public').'system/testings/000');
-        if (is_dir(path('public').'system/testings')) rmdir(path('public').'system/testings');
+        $this->mockFileUploadDir = null;
+        $this->mockDefaultDir = null;
+    }
 
-        // Remove the fake default url directories
-        if (file_exists(path('public').'testings/thumbnail/missing.jpg')) unlink(path('public').'testings/thumbnail/missing.jpg'); 
-        rmdir(path('public').'testings/thumbnail');
-        rmdir(path('public').'testings');
-  	}
+    /**
+     * makeMethodPublic method
+     * 
+     * @param  string $name - The name of the method we're making public
+     * @return callable
+     */
+    protected function makeMethodPublic($name) {
+        $class = new ReflectionClass('TestModel');
+        $method = $class->getMethod($name);
+        $method->setAccessible(true);
+        
+        return $method;
+    }
 
     /**
      * test_remove_files method
@@ -81,138 +81,208 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
      */
     public function test_remove_files() 
     {
-       // Set some object variables to mock the file upload.
-        $this->test_object->id = 1;
-        $this->test_object->testing_file_name = 'test.jpg';
+        $mockedModel = $this->getMock('TestModel', ['path', 'get_offset', 'empty_directory']);
+        $mockedModel->expects($this->once())
+            ->method('path')
+            ->will($this->returnValue('foo/bar'));
 
-        // Attempt to remove the file.
-        $this->test_object->remove_files($this->test_object);
-        $this->assertFileNotExists(path('bundle').'system/testings/000/000/001/thumbnail/test.jpg');
+        $mockedModel->expects($this->once())
+            ->method('get_offset')
+            ->will($this->returnValue(3));
+
+        $mockedModel->expects($this->once())
+            ->method('empty_directory')
+            ->with('foo', true);
+
+        $this->testModel->remove_files($mockedModel);
     }
 
     /**
-     * test___call method
-     *
-     * Test proper file resources are returned form convience methods.
-     *
-     * @dataProvider test___call_provider
+     * testProcessImage meethod
+     * 
+     * @param  callable $resizer         
+     * @param  string $styleDimensions 
+     * @param  boolean $expectedOutput  
+     * @return void                  
+     * @dataProvider testProcessImageDataProvider
      */
-    public function test___call($method, $parameters, $spoof_directory, $expected_output)      
+    public function testProcessImage($resizer, $styleDimensions, $expectedOutput)
     {
-        // if spoof directory is set we'll create a quick directory under the default style 
-        // (original) with our test file in it so that we can test style delegation for some cases.
-        if ($spoof_directory) 
-        {
-            // Create a fake default style directory.
-            mkdir(path('public').'system/testings/000/000/001/original', 0775, true);
-            copy(path('bundle').'stapler/tests/test.jpg', path('public').'system/testings/000/000/001/original/test.jpg');
-        }
+        IoC::register('Resizer', $resizer);
 
-        // Set some object variables to mock the file upload.
-        $this->test_object->id = 1;
-        $this->test_object->testing_file_name = 'test.jpg';
-
-        $actual_output = $this->test_object->__call($method, $parameters);
-        $this->assertEquals($expected_output, $actual_output);
-
-        // After the test we'll tear the default style directory down if it was spoofed.
-        if ($spoof_directory) {
-            // Remove the fake default style directory.
-            unlink(path('public').'system/testings/000/000/001/original/test.jpg');
-            rmdir(path('public').'system/testings/000/000/001/original');
-        }
+        $this->assertEquals($expectedOutput, $this->testModel->process_image('testing', '/foo/bar', $styleDimensions));
     }
 
-     /**
-     * test__call method data provider
-     *
-     * @return array
+    /**
+     * testProcessImageDataProvider method
+     * 
+     * @return array 
      */
-    public function test___call_provider(){
+    public function testProcessImageDataProvider()
+    {
+        $resizer1 = function() {
+            $resizer = $this->getMockBuilder('Resizer')
+                ->setMethods(['resize', 'save'])
+                ->disableOriginalConstructor()
+                ->getMock();
+
+            $resizer->expects($this->once())
+                ->method('resize')
+                ->will($this->returnValue($resizer));
+
+            $resizer->expects($this->once())
+                ->method('save')
+                ->will($this->returnValue(true));
+
+            return $resizer;
+        };
+
         return [
-            ['testing_path', ['thumbnail'], false, path('base').'public/system/testings/000/000/001/thumbnail/test.jpg'],
-            ['testing_url', ['thumbnail'], false, '/system/testings/000/000/001/thumbnail/test.jpg'],
-            ['testing_path', [''], false, path('base').'public/testings/original/missing.jpg'],
-            ['testing_url', [''], false, '/testings/original/missing.jpg'],
-            ['testing_path', [''], true, path('base').'public/system/testings/000/000/001/original/test.jpg'],
-            ['testing_url', [''], true, '/system/testings/000/000/001/original/test.jpg']
+            [$resizer1, '100', true],
+            [$resizer1, 'x100', true],
+            [$resizer1, '100x100#', true],
+            [$resizer1, '100x100!', true],
+            [$resizer1, '100x100', true],
         ];
     }
 
-     /**
-     * test_return_resource method
-     *
-     * Test that a proper file resource is returned.
-     *
-     * @dataProvider test_return_resource_provider
+    /**
+     * test__call method
+     * 
+     * @param  callable $testModel
+     * @param  string $method
+     * @param  string $parameters
+     * @param  string $expectedOutput
+     * @return void
+     * @dataProvider callDataProvider                 
      */
-    public function test_return_resource($type, $attachment, $style, $spoof_directory, $expected_output)
+    public function test__call($testModel, $method, $parameters, $expectedOutput)
     {
-        // if spoof directory is set we'll create a quick directory under the default style 
-        // (original) with our test file in it so that we can test style delegation for some cases.
-        if ($spoof_directory) 
-        {
-            // Create a fake default style directory.
-            mkdir(path('public').'system/testings/000/000/001/original', 0775, true);
-            copy(path('bundle').'stapler/tests/test.jpg', path('public').'system/testings/000/000/001/original/test.jpg');
-        }
-
-        // Set some object variables to mock the file upload.
-        $this->test_object->id = 1;
-        $this->test_object->testing_file_name = 'test.jpg';
-
-        $actual_output = $this->test_object->return_resource($type, $attachment, $style);
-        $this->assertEquals($expected_output, $actual_output);
-
-        // After the test we'll tear the default style directory down if it was spoofed.
-        if ($spoof_directory) {
-            // Remove the fake default style directory.
-            unlink(path('public').'system/testings/000/000/001/original/test.jpg');
-            rmdir(path('public').'system/testings/000/000/001/original');
-        }
+        $actualOutput = $testModel->__call($method, $parameters);
+       
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
-     /**
+    /**
+     * callDataProvider method
+     * 
+     * @return array
+     */
+    public function callDataProvider()
+    {
+        $testModel1 = $this->getMock('TestModel', ['return_resource']);
+        $testModel1->expects($this->once())
+            ->method('return_resource')
+            ->with('path', 'testing')
+            ->will($this->returnValue('testing.path'));
+
+        $testModel2 = $this->getMock('TestModel', ['return_resource']);
+        $testModel2->expects($this->once())
+            ->method('return_resource')
+            ->with('path', 'testing', 'thumbnail')
+            ->will($this->returnValue('testing.path.thumbnail'));
+
+        $testModel3 = $this->getMock('TestModel', ['return_resource']);
+        $testModel3->expects($this->once())
+            ->method('return_resource')
+            ->with('url', 'testing')
+            ->will($this->returnValue('testing.url'));
+
+        $testModel4 = $this->getMock('TestModel', ['return_resource']);
+        $testModel4->expects($this->once())
+            ->method('return_resource')
+            ->with('url', 'testing', 'thumbnail')
+            ->will($this->returnValue('testing.url.thumbnail'));
+
+        return [
+            [$testModel1, 'testing_path', null, 'testing.path'],
+            [$testModel2, 'testing_path', ['thumbnail'], 'testing.path.thumbnail'],
+            [$testModel3, 'testing_url', null, 'testing.url'],
+            [$testModel4, 'testing_url', ['thumbnail'], 'testing.url.thumbnail'],
+        ];
+    }
+
+    /**
+     * testReturnResource method
+     * 
+     * @return void
+     * @dataProvider returnResourceProvider
+     */
+    public function testReturnResource($testModel, $type, $expectedOutput)
+    {
+        $actualOutput = $testModel->return_resource($type, 'thumbnail');
+
+        $this->assertEquals($expectedOutput, $actualOutput);
+    }
+
+    /**
      * test_return_resource method data provider
      *
      * @return array
      */
-    public function test_return_resource_provider()
+    public function returnResourceProvider()
     {
+        $testModel1 = $this->getMock('TestModel', ['path']);
+        $testModel1->expects($this->once())
+            ->method('path')
+            ->will($this->returnValue(vfsStream::url('foo/bar')));
+
+        $testModel2 = $this->getMock('TestModel', ['path', 'default_path']);
+        $testModel2->expects($this->once())
+            ->method('path')
+            ->will($this->returnValue(''));
+        $testModel2->expects($this->once())
+            ->method('default_path')
+            ->will($this->returnValue(true));
+
+        $testModel3 = $this->getMock('TestModel', ['absolute_url', 'url']);
+        $testModel3->expects($this->once())
+            ->method('absolute_url')
+            ->will($this->returnValue(vfsStream::url('foo/bar')));
+        $testModel3->expects($this->once())
+            ->method('url')
+            ->will($this->returnValue(true));
+
+        $testModel4 = $this->getMock('TestModel', ['absolute_url', 'default_url']);
+        $testModel4->expects($this->once())
+            ->method('absolute_url')
+            ->will($this->returnValue(''));
+        $testModel4->expects($this->once())
+            ->method('default_url')
+            ->will($this->returnValue(true));
+
         return [
-            ['path', 'testing', 'thumbnail', false, path('base')."public/system/testings/000/000/001/thumbnail/test.jpg"],
-            ['url', 'testing', 'thumbnail', false, "/system/testings/000/000/001/thumbnail/test.jpg"],
-            ['path', 'testing', '', false, path('base')."public/testings/original/missing.jpg"],
-            ['url', 'testing', '', false, "/testings/original/missing.jpg"],
-            ['path', 'testing', '', true, path('base')."public/system/testings/000/000/001/original/test.jpg"],
-            ['url', 'testing', '', true, "/system/testings/000/000/001/original/test.jpg"]
+            "File path does exist" => [$testModel1, 'path', 'vfs://foo/bar'],
+            "File path doesn't exist" => [$testModel2, 'path', true],
+            "File URL does exists" => [$testModel3, 'url', true],
+            "File URL doesn't exists" => [$testModel4, 'url', true]
         ];
     }
 
     /**
-     * test_file_path method
+     * testPath method
      *
      * Test that a file path is properly formed.
      *
-     * @dataProvider test_path_provider
+     * @dataProvider testPathDataProvider
      */
-    public function test_path($attachment, $style, $expected_output)
+    public function testPath($attachment, $style, $expectedOutput)
     {
         // Set some object variables to mock the file upload.
-        $this->test_object->id = 1;
-        $this->test_object->testing_file_name = 'test.jpg';
+        $this->testModel->id = 1;
+        $this->testModel->testing_file_name = 'test.jpg';
+        $method = $this->makeMethodPublic('path');
+        $actualOutput = $method->invokeArgs($this->testModel, [$attachment, $style]);
 
-        $method = self::getMethod('path');
-        $actual_output = $method->invokeArgs($this->test_object, [$attachment, $style]);
-        $this->assertEquals($expected_output, $actual_output);
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_file_path method data provider
+     * testPathDataProvider method
      *
      * @return array
      */
-    public function test_path_provider()
+    public function testPathDataProvider()
     {
         return [
             ['testing', 'thumbnail', path('base')."public/system/testings/000/000/001/thumbnail/test.jpg"],
@@ -223,26 +293,27 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_default_path method
+     * testDefaultPath method
      *
      * Test that the default path is properly formed.
      *
-     * @dataProvider test_default_path_provider
+     * @dataProvider testDefaultPathDataProvider
      * @return void
      */
-    public function test_default_path($attachment, $style, $expected_output)
+    public function testDefaultPath($attachment, $style, $expectedOutput)
     {
-        $method = self::getMethod('default_path');
-        $actual_output = $method->invokeArgs($this->test_object, [$attachment, $style]);
-        $this->assertEquals($expected_output, $actual_output);
+        $method = $this->makeMethodPublic('default_path');
+        $actualOutput = $method->invokeArgs($this->testModel, [$attachment, $style]);
+
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_default_path method data provider
+     * testDefaultPathDataProvider method
      *
      * @return array
      */
-    public function test_default_path_provider()
+    public function testDefaultPathDataProvider()
     {
         return [
             ['testing', 'thumbnail', path('base').'public/testings/thumbnail/missing.jpg'],
@@ -251,29 +322,29 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_file_url method
+     * testUrl method
      *
      * Test that a file url is properly formed.
      *
-     * @dataProvider test_url_provider
+     * @dataProvider testUrlDataProvider
      */
-    public function test_url($attachment, $style, $expected_output)
+    public function testUrl($attachment, $style, $expectedOutput)
     {
         // Set some object variables to mock the file upload.
-        $this->test_object->id = 1;
-        $this->test_object->testing_file_name = 'test.jpg';
+        $this->testModel->id = 1;
+        $this->testModel->testing_file_name = 'test.jpg';
+        $method = $this->makeMethodPublic('url');
+        $actualOutput = $method->invokeArgs($this->testModel, [$attachment, $style]);
 
-        $method = self::getMethod('url');
-        $actual_output = $method->invokeArgs($this->test_object, [$attachment, $style]);
-        $this->assertEquals($expected_output, $actual_output);
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_file_url method data provider
+     * testUrlDataProvider method
      *
      * @return array
      */
-    public function test_url_provider()
+    public function testUrlDataProvider()
     {
         return [
             ['testing', 'thumbnail', '/system/testings/000/000/001/thumbnail/test.jpg'],
@@ -284,26 +355,27 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_default_url method
+     * testDefaultUrl method
      *
      * Test that the default url is properly formed.
      *
-     * @dataProvider test_default_url_provider
+     * @dataProvider testDefaultUrlDataProvider
      * @return void
      */
-    public function test_default_url($attachment, $style, $expected_output)
+    public function testDefaultUrl($attachment, $style, $expectedOutput)
     {
-        $method = self::getMethod('default_url');
-        $actual_output = $method->invokeArgs($this->test_object, [$attachment, $style]);
-        $this->assertEquals($expected_output, $actual_output);
+        $method = $this->makeMethodPublic('default_url');
+        $actualOutput = $method->invokeArgs($this->testModel, [$attachment, $style]);
+
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_default_url method data provider
+     * testDefaultUrlDataProvider method
      *
      * @return array
      */
-    public function test_default_url_provider()
+    public function testDefaultUrlDataProvider()
     {
         return [
             ['testing', 'thumbnail', '/testings/thumbnail/missing.jpg'],
@@ -312,38 +384,38 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_interpolate_string method 
+     * testInterpolateString method 
      *
      * Test that an interpolated string is properly formed.
      *
-     * @dataProvider test_interpolate_string_provider
+     * @dataProvider testInterpolateStringDataProvider
      * @return void
      */
-    public function test_interpolate_string($input, $expected_output, $style)
+    public function testInterpolateString($input, $expectedOutput, $style)
     {
-        $this->test_object->id = 1;
-        $this->test_object->testing_file_name = 'test.jpg';
+        $this->testModel->id = 1;
+        $this->testModel->testing_file_name = 'test.jpg';
+        $method = $this->makeMethodPublic('interpolate_string');
+        $actualOutput = $method->invokeArgs($this->testModel, ['testing', $input, $style]);
 
-        $method = self::getMethod('interpolate_string');
-        $actual_output = $method->invokeArgs($this->test_object, ['testing', $input, $style]);
-        $this->assertEquals($expected_output, $actual_output);
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_interpolate_string method data provider
+     * testInterpolateStringDataProvider method
      *
      * @return array
      */
-    public function test_interpolate_string_provider()
+    public function testInterpolateStringDataProvider()
     {
         // All possible interpolation options with id_partitioning
         $uninterpolated_strings[] = '/system/:class/:attachment/:id_partition/:style/:filename';
-        $interpolated_strings[] = '/system/TestObject/testings/000/000/001/original/test.jpg';
+        $interpolated_strings[] = '/system/TestModel/testings/000/000/001/original/test.jpg';
         $styles[] = '';
 
         // All possible interpolation options with id_partitioning
         $uninterpolated_strings[] = '/system/:class/:attachment/:id_partition/:style/:filename';
-        $interpolated_strings[] = '/system/TestObject/testings/000/000/001/thumbnail/test.jpg';
+        $interpolated_strings[] = '/system/TestModel/testings/000/000/001/thumbnail/test.jpg';
         $styles[] = 'thumbnail';
 
         // All possible interpolation options with id_partitioning, excluding class
@@ -378,12 +450,12 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
 
         // All possible interpolation options with id
         $uninterpolated_strings[] = '/system/:class/:attachment/:id/:style/:filename';
-        $interpolated_strings[] = '/system/TestObject/testings/1/original/test.jpg';
+        $interpolated_strings[] = '/system/TestModel/testings/1/original/test.jpg';
         $styles[] = '';
 
         // All possible interpolation options with id
         $uninterpolated_strings[] = '/system/:class/:attachment/:id/:style/:filename';
-        $interpolated_strings[] = '/system/TestObject/testings/1/thumbnail/test.jpg';
+        $interpolated_strings[] = '/system/TestModel/testings/1/thumbnail/test.jpg';
         $styles[] = 'thumbnail';
 
         // All possible interpolation options with id, excluding class
@@ -426,28 +498,28 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_filename method
+     * testFilename method
      *
      * Test that the attachment filename is properly returned.
      *
-     * @dataProvider test_filename_provider
+     * @dataProvider testFilenameProvider
      * @return void
      */
-    public function test_filename($filename)
+    public function testFilename($filename)
     {
-        $this->test_object->testing_file_name = $filename;
+        $this->testModel->testing_file_name = $filename;
+        $method = $this->makeMethodPublic('filename');
+        $actualOutput = $method->invokeArgs($this->testModel, ['testing']);
 
-        $method = self::getMethod('filename');
-        $actual_output = $method->invokeArgs($this->test_object, ['testing']);
-        $this->assertEquals($filename, $actual_output);
+        $this->assertEquals($filename, $actualOutput);
     }
 
     /**
-     * test_filename method data provider
+     * testFilenameProvider method
      *
      * @return array
      */
-    public function test_filename_provider()
+    public function testFilenameProvider()
     {
         return [
             ['testing.jpg'],
@@ -460,71 +532,72 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_laravel_root method
+     * testLaravelRoot method
      *
      * Test that Laravel root directory is properly returned.
      *
      * @return void
      */
-    public function test_laravel_root()
+    public function testLaravelRoot()
     {
-        $expected_output = rtrim(path('base'), '/');
-        $method = self::getMethod('laravel_root');
-        $actual_output = $method->invokeArgs($this->test_object, ['testing']);
-        $this->assertEquals($expected_output, $actual_output);
+       $expectedOutput = rtrim(path('base'), '/');
+        $method = $this->makeMethodPublic('laravel_root');
+        $actualOutput = $method->invokeArgs($this->testModel, ['testing']);
+
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_class method
+     * testGetClass method
      *
      * Test that a class name is properly returned.
      *
-     * @dataProvider test_get_class_provider
+     * @dataProvider testGetClassDataProvider
      * @return void
      */
-    public function test_get_class($expected_output)
+    public function testGetClass($expectedOutput)
     {
-        $method = self::getMethod('get_class');
-        $actual_output = $method->invokeArgs($this->test_object, ['testing']);
+        $method = $this->makeMethodPublic('get_class');
+        $actualOutput = $method->invokeArgs($this->testModel, ['testing']);
 
-        $this->assertEquals($expected_output, $actual_output);
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_class method data provider
+     * testGetClassDataProvider method
      *
      * @return array
      */
-    public function test_get_class_provider()
+    public function testGetClassDataProvider()
     {
         return [
-            ['TestObject']
+            ['TestModel']
         ];
     }
 
     /**
-     * test_basename method
+     * testBasename method
      *
      * Test that an basename is properly returned.
      *
-     * @dataProvider test_basename_provider
+     * @dataProvider testBasenameDataProvider
      * @return void
      */
-    public function test_basename($input, $expected_output)
+    public function testBasename($input, $expectedOutput)
     {
-        $this->test_object->testing_file_name = $input;
+        $this->testModel->testing_file_name = $input;
+        $method = $this->makeMethodPublic('basename');
+        $actualOutput = $method->invokeArgs($this->testModel, ['testing', $input]);
 
-        $method = self::getMethod('basename');
-        $actual_output = $method->invokeArgs($this->test_object, ['testing', $input]);
-        $this->assertEquals($expected_output, $actual_output);
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_basename method data provider
+     * testBasenameDataProvider method
      *
      * @return array
      */
-    public function test_basename_provider()
+    public function testBasenameDataProvider()
     {
         return [
             ['testing1.2.jpg', 'testing1.2'],
@@ -535,28 +608,28 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_extension method
+     * testExtension method
      *
      * Test that an extension is properly returned.
      *
-     * @dataProvider test_extension_provider
+     * @dataProvider testExtensionDataProvider
      * @return void
      */
-    public function test_extension($input, $expected_output)
+    public function testExtension($input, $expectedOutput)
     {
-        $this->test_object->testing_file_name = $input;
+        $this->testModel->testing_file_name = $input;
+        $method = $this->makeMethodPublic('extension');
+        $actualOutput = $method->invokeArgs($this->testModel, ['testing', $input]);
 
-        $method = self::getMethod('extension');
-        $actual_output = $method->invokeArgs($this->test_object, ['testing', $input]);
-        $this->assertEquals($expected_output, $actual_output);
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_extension method data provider
+     * testExtensionDataProvider method
      *
      * @return array
      */
-    public function test_extension_provider()
+    public function testExtensionDataProvider()
     {
         return [
             ['testing.jpg', 'jpg'],
@@ -570,27 +643,28 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_id method
+     * testId method
      *
      * Test that an id is properly returned.
      *
-     * @dataProvider test_id_provider
+     * @dataProvider testIdDataProvider
      * @return void
      */
-    public function test_id($input, $expected_output)
+    public function testId($input, $expectedOutput)
     {
-        $this->test_object->id = $input;
-        $method = self::getMethod('id');
-        $actual_output = $method->invokeArgs($this->test_object, ['testing', $input]);
-        $this->assertEquals($expected_output, $actual_output);
+        $this->testModel->id = $input;
+        $method = $this->makeMethodPublic('id');
+        $actualOutput = $method->invokeArgs($this->testModel, ['testing', $input]);
+
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_id_partition method data provider
+     * testIdDataProvider method 
      *
      * @return array
      */
-    public function test_id_provider()
+    public function testIdDataProvider()
     {
         return [
             ['9', '9'],
@@ -605,28 +679,28 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_id_partition method
+     * testIdPartition method
      *
      * Test that an id partition is properly formed.
      *
-     * @dataProvider test_id_partition_provider
+     * @dataProvider testIdPartitionDataProvider
      * @return void
      */
-    public function test_id_partition($input, $expected_output)
+    public function testIdPartition($input, $expectedOutput)
     {
-        $this->test_object->id = $input;
+        $this->testModel->id = $input;
+        $method = $this->makeMethodPublic('id_partition');
+        $actualOutput = $method->invokeArgs($this->testModel, ['testing', $input]);
 
-        $method = self::getMethod('id_partition');
-        $actual_output = $method->invokeArgs($this->test_object, ['testing', $input]);
-        $this->assertEquals($expected_output, $actual_output);
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_id_partition method data provider
+     * testIdPartitionDataProvider method
      *
      * @return array
      */
-    public function test_id_partition_provider()
+    public function testIdPartitionDataProvider()
     {
         return [
             ['9', '000/000/009'],
@@ -641,26 +715,27 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_attachment method
+     * testAttachment method
      *
      * Test that an id partition is properly formed.
      *
-     * @dataProvider test_attachment_provider
+     * @dataProvider testAttachmentDataProvider
      * @return void
      */
-    public function test_attachment($input, $expected_output)
+    public function testAttachment($input, $expectedOutput)
     {
-        $method = self::getMethod('attachment');
-        $actual_output = $method->invokeArgs($this->test_object, [$input]);
-        $this->assertEquals($expected_output, $actual_output);
+        $method = $this->makeMethodPublic('attachment');
+        $actualOutput = $method->invokeArgs($this->testModel, [$input]);
+
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_attachment method data provider
+     * testAttachmentDataProvider method
      *
      * @return array
      */
-    public function test_attachment_provider()
+    public function testAttachmentDataProvider()
     {
         return [
             ['testing', 'testings'],
@@ -669,26 +744,27 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_style method
+     * testStyle method
      *
      * Test that an id partition is properly formed.
      *
-     * @dataProvider test_style_provider
+     * @dataProvider testStyleDataProvider
      * @return void
      */
-    public function test_style($input, $expected_output)
+    public function testStyle($input, $expectedOutput)
     {
-        $method = self::getMethod('style');
-        $actual_output = $method->invokeArgs($this->test_object, ['testing', $input]);
-        $this->assertEquals($expected_output, $actual_output);
+        $method = $this->makeMethodPublic('style');
+        $actualOutput = $method->invokeArgs($this->testModel, ['testing', $input]);
+        
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_style method data provider
+     * testStyleDataProvider method
      *
      * @return array
      */
-    public function test_style_provider()
+    public function testStyleDataProvider()
     {
         return [
             ['some_style', 'some_style'],
@@ -697,28 +773,28 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_get_offset method
+     * testGetOffset method
      *
      * Test that an string offset is properly formed.
      *
-     * @dataProvider test_get_offset_provider
+     * @dataProvider testGetOffsetDataProvider
      * @return void
      */
-    public function test_get_offset($id, $input, $expected_output)
+    public function testGetOffset($id, $input, $expectedOutput)
     {
-        $this->test_object->id = $id;
+        $this->testModel->id = $id;
+        $method = $this->makeMethodPublic('get_offset');
+        $actualOutput = $method->invokeArgs($this->testModel, [$input, 'testing']);
 
-        $method = self::getMethod('get_offset');
-        $actual_output = $method->invokeArgs($this->test_object, [$input, 'testing']);
-        $this->assertEquals($expected_output, $actual_output);
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_get_offset method data provider
+     * testGetOffset method data provider
      *
      * @return array
      */
-    public function test_get_offset_provider()
+    public function testGetOffsetDataProvider()
     {
         return [
             [1, '/some/file/path/000/000/001/some_style/some_file.jpg', 27],
@@ -731,26 +807,27 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_handle_backslashes method
+     * testHandleBackslashes method
      *
      * Test that an string is properly formed.
      *
-     * @dataProvider test_handle_backslashes_provider
+     * @dataProvider testHandleBackslashesDataProvider
      * @return void
      */
-    public function test_handle_backslashes($input, $expected_output)
+    public function testHandleBackslashes($input, $expectedOutput)
     {
-        $method = self::getMethod('handle_backslashes');
-        $actual_output = $method->invokeArgs($this->test_object, [$input]);
-        $this->assertEquals($expected_output, $actual_output);
+        $method = $this->makeMethodPublic('handle_backslashes');
+        $actualOutput = $method->invokeArgs($this->testModel, [$input]);
+
+        $this->assertEquals($expectedOutput, $actualOutput);
     }
 
     /**
-     * test_handle_backslashes method data provider
+     * testHandleBackslashesDataProvider method 
      *
      * @return array
      */
-    public function test_handle_backslashes_provider()
+    public function testHandleBackslashesDataProvider()
     {
         return [
             ['foo\\bar', 'foo/bar'],
@@ -759,16 +836,97 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
-     * test_arrange_files method
+     * testRemoveDirectory method
+     *
+     * Test that the empty directory method will remove all files in a directory
+     * and the directory itself when the delete_directory flag is set to true.
+     * 
+     * @return void            
+     */
+    public function testRemoveDirectory()
+    {
+        $directory = vfsStream::url('foo');
+        $method = $this->makeMethodPublic('empty_directory');
+        $method->invokeArgs($this->testModel, [$directory, true]);
+
+        $this->assertFileNotExists(vfsStream::url('foo'));
+    }
+
+    /**
+     * testEmptyDirectory method
+     *
+     * Test that the empty directory method will remove all files in a directory,
+     * but not the parent directory, when the delete_directory flag is set to false.
+     * 
+     * @return void
+     */
+    public function testEmptyDirectory()
+    {
+        $directory = vfsStream::url('foo');
+        $method = $this->makeMethodPublic('empty_directory');
+        $method->invokeArgs($this->testModel, [$directory]);
+        
+        $this->assertFalse($this->mockFileUploadDir->hasChild('bar'));
+        $this->assertFileExists(vfsStream::url('foo'));
+    }
+
+    /**
+     * testArrangeFiles method
      *
      * Test that multiple file uploads are properly re-arranged
      *
-     * @dataProvider test_arrange_files_provider
+     * @dataProvider testArrangeFilesDataProvider
      * @return void
      */
-    public function test_arrange_files($files)
+    public function testArrangeFiles($files, $expectedOutput)
     {
-        $expected_output = [
+        $actualOutput = $this->testModel->arrange_files($files);
+        
+        $this->assertEquals($expectedOutput, $actualOutput);
+
+    }
+
+    /**
+     * testArrangeFilesDataProvider method
+     *
+     * @return array
+     */
+    public function testArrangeFilesDataProvider()
+    {
+        $files = [
+            'name' => [
+                0 => 'test1.jpg',
+                1 => 'test2.jpg',
+                2 => 'test3.jpg',
+                3 => 'test4.jpg'
+            ],
+            'type' => [
+                0 => 'image/jpeg',
+                1 => 'image/jpeg',
+                2 => 'image/jpeg',
+                3 => 'image/jpeg'
+            ],
+            'tmp_name' => [
+                0 => '/tmp/nsl51Gs',
+                1 => '/tmp/nsl52Gs',
+                2 => '/tmp/nsl53Gs',
+                3 => '/tmp/nsl54Gs'
+            ],
+            'error' => [
+                0 => 0,
+                1 => 0,
+                2 => 0,
+                3 => 0,
+            ],
+            'size' => [
+                0 => 1715,
+                1 => 1715,
+                2 => 1715,
+                3 => 1715
+           ]
+        ];
+
+        $expectedOutput = [
             0 => [
                 'name' => 'test1.jpg',
                 'type' => 'image/jpeg',
@@ -799,54 +957,8 @@ class StaplerTest extends PHPUnit_Framework_TestCase {
             ]
         ];
 
-        $actual_output = $this->test_object->arrange_files($files);
-        $this->assertEquals($expected_output, $actual_output);
-
-    }
-
-    /**
-     * test_arrange_files method data provider
-     *
-     * @return array
-     */
-    public function test_arrange_files_provider()
-    {
         return [
-            [
-                [
-                    'name' => [
-                        0 => 'test1.jpg',
-                        1 => 'test2.jpg',
-                        2 => 'test3.jpg',
-                        3 => 'test4.jpg'
-                    ],
-                    'type' => [
-                        0 => 'image/jpeg',
-                        1 => 'image/jpeg',
-                        2 => 'image/jpeg',
-                        3 => 'image/jpeg'
-                    ],
-                    'tmp_name' => [
-                        0 => '/tmp/nsl51Gs',
-                        1 => '/tmp/nsl52Gs',
-                        2 => '/tmp/nsl53Gs',
-                        3 => '/tmp/nsl54Gs'
-                    ],
-                    'error' => [
-                        0 => 0,
-                        1 => 0,
-                        2 => 0,
-                        3 => 0,
-                    ],
-                    'size' => [
-                        0 => 1715,
-                        1 => 1715,
-                        2 => 1715,
-                        3 => 1715
-                   ]
-                ]
-            ]
+            [$files, $expectedOutput]
         ];
     }
-
 }

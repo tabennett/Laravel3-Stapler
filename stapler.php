@@ -3,6 +3,7 @@
 use Laravel\Event;
 use Laravel\File;
 use Laravel\Str;
+use Laravel\IoC;
 
 /**
  * Easy file attachment management for Eloquent.
@@ -127,7 +128,7 @@ trait Stapler
 	/**
 	 * Set values for the model's file attribute fields before it's saved.
 	 *
-	 * @param model $model
+	 * @param model $model - The instance of the model object that triggering the save event.
 	 * @return void
 	*/
 	public static function set_attributes($model)
@@ -187,7 +188,7 @@ trait Stapler
 	/**
 	 * Process the file upload(s).
 	 *
-	 * @param model $model
+	 * @param model $model - The instance of the model object that triggered the save event.
 	 * @return void
 	*/
 	public static function upload($model)
@@ -216,48 +217,25 @@ trait Stapler
 					$file_path = $model->path($attachment, $style_name);
 
 					// Create the directory if it doesn't already exist.
-					if (!is_dir(dirname($file_path)))
-					{
+					if (!is_dir(dirname($file_path))) {
 						mkdir(dirname($file_path), 0777, true);
 					}
 
 					// Remove previous uploads.
-					if (!$attachment_options['keep_old_files'])
-					{
+					if (!$attachment_options['keep_old_files']) {
 						$file_directory = dirname($file_path);
 						$model->empty_directory($file_directory);
 					}
 
-					if (!empty($style_dimensions) && static::is_image($model->tmp_file[$attachment]['tmp_name']))
-					{
-						// This is an image file so we'll need to loop through each style and
-						// do any necessary resizing using the Resizer bundle to save our files.
-						$dimensions = explode('x', $style_dimensions);
-						$width = $dimensions[0];
-						$height = $dimensions[1];
-						
-						if(strpos($height, '#') === false)
-						{
-							$success = \Resizer::open($model->tmp_file[$attachment])
-							->resize($width , $height , 'auto')
-							->save($file_path);
-						}
-						else
-						{
-							$height = rtrim($height, '#');
-							$success = \Resizer::open($model->tmp_file[$attachment])
-							->resize($width , $height , 'crop')
-							->save($file_path);
-						}
+					// If the file is an image, process and move it, otherwise just move it where it belongs.
+					if (!empty($style_dimensions) && $model->is_image($model->tmp_file[$attachment]['tmp_name'])) {
+						$success = $model->process_image($attachment, $file_path, $style_dimensions);
 					}
-					else
-					{
-						// Just save the new file upload.
+					else {
 						$success = move_uploaded_file($model->tmp_file[$attachment]['tmp_name'], $file_path);
 					}
 					
-					if (!$success)
-					{
+					if (!$success) {
 				        throw new \Exception("Stapler: Failed to save file.");
 					}
 				}
@@ -271,7 +249,7 @@ trait Stapler
 	/**
 	 * Remove file uploads from the file system after record deletion.
 	 *
-	 * @param model $model
+	 * @param model $model - The instance of the model object that triggered the delete event.
 	 * @return void
 	*/
 	public static function remove_files($model)
@@ -290,6 +268,66 @@ trait Stapler
 	}
 
 	/**
+	 * process_image method 
+	 * 
+	 * Parse the given style dimensions to extract out the file processing options,
+	 * perform any necessary image resizing for a given style using the Resizer bundle.
+	 *
+	 * @param  string $attachment - The name of the current file attachment being processed.
+	 * @param  string $file_path - The location in the file system where the file will be saved after processing.
+	 * @param  array $style_dimensions - The given image sizing style (50x50, 10, etc).
+	 * @return boolean
+	 */
+	public function process_image($attachment, $file_path, $style_dimensions)
+	{
+		$resizer = \Laravel\IoC::resolve('Resizer', [$this->tmp_file[$attachment]]);
+
+		if (strpos($style_dimensions, 'x') === false) 
+		{
+			// Width given, height automagically selected to preserve aspect ratio (landscape).
+			$width = $style_dimensions;
+			return $resizer->resize($width, null, 'landscape')
+					->save($file_path);
+		}
+		
+		$dimensions = explode('x', $style_dimensions);
+		$width = $dimensions[0];
+		$height = $dimensions[1];
+		
+		if (empty($width)) 
+		{
+			// Height given, width automagically selected to preserve aspect ratio (portrait).
+			return $resizer->resize(null, $height, 'portrait')
+			->save($file_path);
+		}
+		
+		$resizing_option = substr($height, -1, 1);
+		switch ($resizing_option) {
+			case '#':
+				// Resize, then crop.
+				$height = rtrim($height, '#');
+				$success = $resizer->resize($width, $height, 'crop')
+				->save($file_path);
+				break;
+
+			case '!':
+				// Resize by exact width/height (does not preserve aspect ratio).
+				$height = rtrim($height, '!');
+				$success = $resizer->resize($width, $height, 'exact')
+				->save($file_path);
+				break;
+			
+			default:
+				// Let the script decide the best way to resize.
+				$success = $resizer->resize($width, $height, 'auto')
+				->save($file_path);
+				break;
+		}
+
+		return $success;
+	}
+
+	/**
 	 * Handle dynamic method calls on the model.
 	 *
 	 * This allows for the creation of our file url/path convenience methods
@@ -301,30 +339,32 @@ trait Stapler
 	 * @param  array   $parameters
 	 * @return mixed
 	 */
-	public function __call($method, $parameters)
+	public function __call($method, $parameters = null)
 	{
-		foreach($this->attached_files as $key => $value){
+		foreach($this->attached_files as $key => $value)
+		{
 			if (starts_with($method, "{$key}_"))
 			{
 				$pieces = explode('_', $method);
 				switch ($pieces[1]) {
 					case 'path':
-						if(!empty($parameters)){
+						if (!empty($parameters)){
 							return $this->return_resource('path', $pieces[0], $parameters[0]);
 						}
-						else{
+						else {
 							return $this->return_resource('path', $pieces[0]);
 						}
 						
 						break;
 					
 					case 'url':
-						if(!empty($parameters)){
+						if (!empty($parameters)){
 							return $this->return_resource('url', $pieces[0], $parameters[0]);
 						}
 						else{
 							return $this->return_resource('url', $pieces[0]);
 						}
+						
 						break;
 
 					default:
@@ -352,21 +392,21 @@ trait Stapler
 			case 'path':
 				$resource = $this->path($attachment, $style);
 
-				if(file_exists($resource)){
+				if (file_exists($resource)) {
 					return $resource;
 				}
-				else{
+				else {
 					return $this->default_path($attachment, $style);
 				}
 
 				break;
 			case 'url':
-				$resource = $this->url($attachment, $style);
+				$resource = $this->absolute_url($attachment, $style);
 
-				if(file_exists(path('public').$resource)){
-					return $resource;
+				if (file_exists($resource)) {
+					return $this->url($attachment, $style);
 				}
-				else{
+				else {
 					return $this->default_url($attachment, $style);
 				}
 
@@ -384,7 +424,7 @@ trait Stapler
 	 * @param string $file
 	 * @return bool
 	*/
-	protected static function is_image($file)
+	protected function is_image($file)
 	{
 		if (File::is('jpg', $file) || File::is('jpeg', $file) || File::is('gif', $file) || File::is('png', $file))
 		{
@@ -395,7 +435,7 @@ trait Stapler
 	}
 
 	/**
-	 * Generates the path to a file upload.  This is used for saving files, etc.
+	 * Generates the file system path to an uploaded file.  This is used for saving files, etc.
 	 *
 	 * @param string $attachment
 	 * @param string $style
@@ -416,6 +456,18 @@ trait Stapler
 	protected function default_path($attachment, $style = '')
 	{
 		return $this->laravel_root($attachment, $style).'/public'.$this->default_url($attachment, $style);
+	}
+
+	/**
+	 * Generates the absolute url to an uploaded file.
+	 * 
+	 * @param  string $attachment 
+	 * @param  string $style      
+	 * @return string             
+	 */
+	protected function absolute_url($attachment, $style= '')
+	{
+		return path('public').$this->url($attachment, $style);
 	}
 
 	/**
@@ -627,31 +679,32 @@ trait Stapler
 	 *
 	 * @desc Recursively loops through each file in the directory and deletes it.
 	 * @param string $directory
-	 * @param boolean $deleteDirectory
+	 * @param boolean $delete_directory
 	 * @return void
 	 */
-	protected function empty_directory($directory, $deleteDirectory = false)
+	protected function empty_directory($directory, $delete_directory = false)
 	{
-		if (!$directoryHandle = @opendir($directory)) 
-		{
+		if (!$directory_handle = opendir($directory)) {
 			return;
 		}
 		
-		while (false !== ($object = readdir($directoryHandle))) 
+		while (false !== ($object = readdir($directory_handle))) 
 		{
-			if ($object=='.' || $object=='..')
-			{
+			if ($object == '.' || $object == '..') {
 				continue;
 			}
 
-			if (!@unlink($directory.'/'.$object))
-			{
-				$this->empty_directory($directory.'/'.$object, true);		// The object is a folder
+			if (!is_dir($directory.'/'.$object)) {
+				unlink($directory.'/'.$object);
+			}
+			else {
+				$this->empty_directory($directory.'/'.$object, true);	// The object is a folder, recurse through it.
 			}
 		}
-		if ($deleteDirectory)
+		
+		if ($delete_directory)
 		{
-			closedir($directoryHandle);
+			closedir($directory_handle);
 			rmdir($directory);
 		}
 	}

@@ -136,6 +136,18 @@ In a minimal configuration, the following settings are enabled by default:
 
 will create a copy of the file upload, resized and cropped to 100x100.
 
+Currently, Stapler relies on the Laravel Resizer bundle, which in turn makes use of the PHP GD library for image processing.  However, because Stapler
+is inspired by Rails paperclip plugin (which makes use of ImageMagick for image processing) the following ImageMagick processing directives will be 
+recognized when defining Stapler styles:
+
+*   **width**: A style that defines a width only (landscape).  Height will be automagically selected to preserve aspect ratio.  This works well for resizing
+    images for display on mobile devices, etc.
+*   **xheight**: A style that defines a heigh only (portrait).  Width automagically selected to preserve aspect ratio.
+*   **widthxheight#**: Resize then crop.
+*   **widthxheight!**: Resize by exacty width and height.  Width and height emphatically given, original aspect ratio will be ignored.
+*   **widthxheight**: Auto determine both width and height when resizing.  This will resize as close as possible to the given dimensions while still preserving the original aspect ratio.
+ 
+
 ## Examples
 
 Create an attachment named 'picture', with both thumbnail (100x100) and large (300x300) styles, using custom url and default_url configurations.
