@@ -254,17 +254,16 @@ trait Stapler
 	*/
 	public static function remove_files($model)
 	{
-		// Grab the first attachment for model
-		reset($model->attached_files);
-		$attachment = key($model->attached_files);
-
-		// Build a path to the id/id_partition directory for this model
-		$path = $model->path($attachment);
-		$offset = $model->get_offset($path, $attachment);
-		$directory = substr($path, 0, $offset);
-		
-		// Remove the directory and all the files within it.
-		$model->empty_directory($directory, true);
+		foreach ($model->attached_files as $attachment => $attachment_options) 
+		{
+			// Build a path to the id/id_partition directory for this model
+			$path = $model->path($attachment);
+			$offset = $model->get_offset($path, $attachment);
+			$directory = substr($path, 0, $offset);
+			
+			// Remove the directory and all the files within it.
+			$model->empty_directory($directory, true);
+		}
 	}
 
 	/**
