@@ -74,9 +74,9 @@ public function post_create()
 
 In your show view:
 ```php
-<?= HTML::image($user->avatar_url() ?>
-<?= HTML::image($user->avatar_url('medium') ?>
-<?= HTML::image($user->avatar_url('thumb') ?>
+<?= HTML::image($user->avatar_url()) ?>
+<?= HTML::image($user->avatar_url('medium')) ?>
+<?= HTML::image($user->avatar_url('thumb')) ?>
 ```
 
 To detach a file, simply set the attribute to null:
